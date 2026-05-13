@@ -30,12 +30,16 @@ async function main() {
     { severity: Severity.MEDIUM, responseMinutes: 480, resolutionMinutes: 14400, is24x7: false },
     { severity: Severity.LOW, responseMinutes: 480, resolutionMinutes: 28800, is24x7: false },
   ]
-  for (const sla of slaDefaults) {
-    await prisma.slaConfig.upsert({
-      where: { organizationId_severity: { organizationId: null as any, severity: sla.severity } },
-      update: {},
-      create: { ...sla, organizationId: null }
-    })
+  // Create SLA configs for each org
+  const allOrgs = [dap, pco, internal]
+  for (const org of allOrgs) {
+    for (const sla of slaDefaults) {
+      await prisma.slaConfig.upsert({
+        where: { organizationId_severity: { organizationId: org.id, severity: sla.severity } },
+        update: {},
+        create: { ...sla, organizationId: org.id }
+      })
+    }
   }
 
   // Users
