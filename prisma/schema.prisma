@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  domain      String?
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  tickets     Ticket[]
+  slaConfigs  SlaConfig[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  passwordHash   String?
+  role           UserRole @default(CLIENT)
+  organizationId String?
+  isActive       Boolean  @default(true)
+  avatarUrl      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization?  @relation(fields: [organizationId], references: [id])
+  submittedTickets Ticket[]     @relation("SubmittedBy")
+  assignedTickets  Ticket[]     @relation("AssignedTo")
+  replies        TicketReply[]
+  history        TicketHistory[]
+}
+
+enum UserRole {
+  CLIENT
+  AGENT
+  MANAGER
+  ADMIN
+}
+
+model Ticket {
+  id             String       @id @default(cuid())
+  ticketNumber   String       @unique
+  title          String
+  description    String       @db.Text
+  status         TicketStatus @default(OPEN)
+  severity       Severity     @default(MEDIUM)
+  category       String
+  organizationId String
+  submittedById  String
+  assignedToId   String?
+  
+  // SLA fields
+  slaDeadlineResponse   DateTime?
+  slaDeadlineResolution DateTime?
+  firstResponseAt       DateTime?
+  resolvedAt            DateTime?
+  slaBreached           Boolean  @default(false)
+  slaPausedAt           DateTime?
+  slaAccumulatedPause   Int      @default(0) // minutes
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  closedAt       DateTime?
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  submittedBy    User            @relation("SubmittedBy", fields: [submittedById], references: [id])
+  assignedTo     User?           @relation("AssignedTo", fields: [assignedToId], references: [id])
+  replies        TicketReply[]
+  attachments    TicketAttachment[]
+  history        TicketHistory[]
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  PENDING_CLIENT
+  RESOLVED
+  CLOSED
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model TicketReply {
+  id         String   @id @default(cuid())
+  ticketId   String
+  authorId   String
+  content    String   @db.Text
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ticket     Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author     User   @relation(fields: [authorId], references: [id])
+  attachments TicketAttachment[]
+}
+
+model TicketAttachment {
+  id         String   @id @default(cuid())
+  ticketId   String
+  replyId    String?
+  filename   String
+  fileUrl    String
+  fileSize   Int
+  mimeType   String
+  uploadedAt DateTime @default(now())
+
+  ticket     Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  reply      TicketReply? @relation(fields: [replyId], references: [id])
+}
+
+model TicketHistory {
+  id         String   @id @default(cuid())
+  ticketId   String
+  userId     String
+  action     String
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime @default(now())
+
+  ticket     Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user       User   @relation(fields: [userId], references: [id])
+}
+
+model SlaConfig {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  severity        Severity
+  responseMinutes Int
+  resolutionMinutes Int
+  is24x7          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, severity])
+}
+
+model KnowledgeArticle {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  category    String
+  slug        String   @unique
+  isPublished Boolean  @default(true)
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
