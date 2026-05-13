@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!user.isActive) {
-    return NextResponse.json({ error: 'Account is deactivated' }, { status: 403 })
+    return NextResponse.json({ error: 'Account pending approval. Please wait for an administrator to activate your account.' }, { status: 403 })
   }
 
   const res = NextResponse.json({ success: true, role: user.role })

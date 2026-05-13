@@ -25,3 +25,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json(user)
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session || session.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { id } = await params
+
+  // Safety: prevent deleting yourself
+  if (id === session.id) {
+    return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
+  }
+
+  // Only allow deletion of inactive (pending/rejected) users
+  const user = await prisma.user.findUnique({ where: { id } })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (user.isActive) return NextResponse.json({ error: 'Cannot delete an active user' }, { status: 400 })
+
+  await prisma.user.delete({ where: { id } })
+  return NextResponse.json({ success: true })
+}

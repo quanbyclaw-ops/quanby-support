@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { RoleBadge } from '@/components/Badge'
 import { formatDate } from '@/lib/utils'
 import AddUserModal from './AddUserModal'
+import ApproveUserButton from './ApproveUserButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,17 +14,27 @@ export default async function UsersPage() {
 
   const users = await prisma.user.findMany({
     include: { organization: { select: { name: true } } },
-    orderBy: [{ role: 'asc' }, { name: 'asc' }],
+    orderBy: [{ isActive: 'asc' }, { role: 'asc' }, { name: 'asc' }],
   })
 
   const orgs = await prisma.organization.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
+
+  const pendingCount = users.filter(u => !u.isActive).length
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-sm text-gray-500 mt-1">{users.length} users registered</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-gray-500">{users.length} users registered</p>
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                {pendingCount} pending approval
+              </span>
+            )}
+          </div>
         </div>
         {session.role === 'ADMIN' && <AddUserModal orgs={orgs} />}
       </div>
@@ -37,14 +48,17 @@ export default async function UsersPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Organization</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
+              {session.role === 'ADMIN' && (
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {users.map(u => (
-              <tr key={u.id} className="table-row">
+              <tr key={u.id} className={`table-row ${!u.isActive ? 'bg-amber-50/40' : ''}`}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#1a3a5c] flex items-center justify-center text-white text-sm font-bold">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${u.isActive ? 'bg-[#1a3a5c]' : 'bg-amber-400'}`}>
                       {u.name.charAt(0)}
                     </div>
                     <div>
@@ -56,11 +70,28 @@ export default async function UsersPage() {
                 <td className="px-4 py-3"><RoleBadge role={u.role} /></td>
                 <td className="px-4 py-3 text-gray-600">{u.organization?.name || '—'}</td>
                 <td className="px-4 py-3">
-                  <span className={`badge border-0 ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {u.isActive ? 'Active' : 'Inactive'}
-                  </span>
+                  {u.isActive ? (
+                    <span className="badge border-0 bg-green-100 text-green-700">Active</span>
+                  ) : (
+                    <span className="badge border-0 bg-amber-100 text-amber-700 flex items-center gap-1 w-fit">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      Pending Approval
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-400">{formatDate(u.createdAt)}</td>
+                {session.role === 'ADMIN' && (
+                  <td className="px-4 py-3">
+                    {!u.isActive ? (
+                      <div className="flex items-center gap-2">
+                        <ApproveUserButton userId={u.id} action="approve" />
+                        <ApproveUserButton userId={u.id} action="reject" />
+                      </div>
+                    ) : (
+                      <ApproveUserButton userId={u.id} action="deactivate" />
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
