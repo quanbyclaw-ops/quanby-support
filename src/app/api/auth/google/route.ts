@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server'
 // Required env vars: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
 
 export async function GET(request: Request) {
-  const url = new URL(request.url)
-  const baseUrl = `${url.protocol}//${url.host}`
-  return NextResponse.redirect(new URL('/?error=google_sso_coming_soon', baseUrl))
+  const host = request.headers.get('host') || 'support.quanbyit.com'
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  return NextResponse.redirect(new URL(`${proto}://${host}/?error=google_sso_coming_soon`))
 }
